@@ -810,31 +810,95 @@ namespace Assets.src.f
 							break;
 						}
 					case -125:
+					{
+						ChatTextField.gI().isShow = false;
+
+						string title = msg.reader().readUTF();
+
+						Res.outz("title = " + title);
+
+						sbyte inputCount = msg.reader().readByte();
+
+						string[] inputNames =
+							new string[inputCount];
+
+						sbyte[] inputTypes =
+							new sbyte[inputCount];
+
+						// Đọc thông tin các textfield trước.
+						for (int i = 0; i < inputCount; i++)
 						{
-							ChatTextField.gI().isShow = false;
-							string text4 = msg.reader().readUTF();
-							Res.outz("titile= " + text4);
-							sbyte b32 = msg.reader().readByte();
-							ClientInput.gI().setInput(b32, text4);
-							for (int num45 = 0; num45 < b32; num45++)
-							{
-								ClientInput.gI().tf[num45].name = msg.reader().readUTF();
-								sbyte b33 = msg.reader().readByte();
-								if (b33 == 0)
-								{
-									ClientInput.gI().tf[num45].setIputType(TField.INPUT_TYPE_NUMERIC);
-								}
-								if (b33 == 1)
-								{
-									ClientInput.gI().tf[num45].setIputType(TField.INPUT_TYPE_ANY);
-								}
-								if (b33 == 2)
-								{
-									ClientInput.gI().tf[num45].setIputType(TField.INPUT_TYPE_PASSWORD);
-								}
-							}
-							break;
+							inputNames[i] =
+								msg.reader().readUTF();
+
+							inputTypes[i] =
+								msg.reader().readByte();
 						}
+
+						if (title == "GiftCode")
+						{
+							/*
+							* Phần dữ liệu mở rộng mà
+							* createFormGiftCode() gửi thêm.
+							*/
+							int codeCount =
+								msg.reader().readUnsignedByte();
+
+							string[] giftCodes =
+								new string[codeCount];
+
+							for (int i = 0; i < codeCount; i++)
+							{
+								giftCodes[i] =
+									msg.reader().readUTF();
+							}
+
+							ClientInput.gI().setGiftCodeInput(
+								inputCount,
+								"Giftcode",
+								giftCodes
+							);
+						}
+						else
+						{
+							// Các form cũ vẫn chạy như trước.
+							ClientInput.gI().setInput(
+								inputCount,
+								title
+							);
+						}
+
+						/*
+						* Gán tên và loại dữ liệu cho textfield
+						* sau khi ClientInput đã khởi tạo.
+						*/
+						for (int i = 0; i < inputCount; i++)
+						{
+							ClientInput.gI().tf[i].name =
+								inputNames[i];
+
+							if (inputTypes[i] == 0)
+							{
+								ClientInput.gI().tf[i].setIputType(
+									TField.INPUT_TYPE_NUMERIC
+								);
+							}
+							else if (inputTypes[i] == 1)
+							{
+								ClientInput.gI().tf[i].setIputType(
+									TField.INPUT_TYPE_ANY
+								);
+							}
+							else if (inputTypes[i] == 2)
+							{
+								ClientInput.gI().tf[i].setIputType(
+									TField.INPUT_TYPE_PASSWORD
+								);
+							}
+						}
+
+						break;
+					}
 					case -110:
 						{
 							sbyte b28 = msg.reader().readByte();

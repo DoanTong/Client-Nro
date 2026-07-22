@@ -75,6 +75,22 @@ public class Char : IMapObject
 
 	public int cy = 24;
 
+	// Tọa độ chỉ dùng để hiển thị, không gửi lên server
+	private float renderX = 24f;
+	private float renderY = 24f;
+
+	private bool renderPositionReady;
+	private int lastRenderUnityFrame = -1;
+
+	// Càng lớn càng bám sát nhân vật, càng nhỏ càng mềm nhưng trễ hơn
+	private const float RENDER_SMOOTH_SPEED = 30f;
+
+	// Di chuyển quá xa thì coi là dịch chuyển tức thời
+	private const float RENDER_SNAP_DISTANCE = 120f;
+
+	// Chặn animation túi chạy theo 120 FPS
+	private int lastBagGameTick = -1;
+
 	public int cvx;
 
 	public int cvy;
@@ -1293,6 +1309,70 @@ public class Char : IMapObject
 		statusMe = 6;
 	}
 
+	private void updateRenderPosition()
+	{
+		// Có thể có nhiều lệnh vẽ trong cùng một Unity frame
+		if (lastRenderUnityFrame == Time.frameCount)
+		{
+			return;
+		}
+
+		lastRenderUnityFrame = Time.frameCount;
+
+		if (!renderPositionReady)
+		{
+			resetRenderPosition();
+			return;
+		}
+
+		float deltaX = cx - renderX;
+		float deltaY = cy - renderY;
+
+		// Đổi map, teleport hoặc tọa độ nhảy quá xa thì không nội suy
+		if (isTeleport
+			|| isSetPos
+			|| Mathf.Abs(deltaX) > RENDER_SNAP_DISTANCE
+			|| Mathf.Abs(deltaY) > RENDER_SNAP_DISTANCE)
+		{
+			resetRenderPosition();
+			return;
+		}
+
+		float deltaTime = Time.unscaledDeltaTime;
+
+		if (deltaTime <= 0f)
+		{
+			deltaTime = 1f / 120f;
+		}
+
+		// Công thức này cho cảm giác gần giống nhau ở 60 và 120 FPS
+		float smoothAmount =
+			1f - Mathf.Exp(-RENDER_SMOOTH_SPEED * deltaTime);
+
+		renderX = Mathf.Lerp(renderX, cx, smoothAmount);
+		renderY = Mathf.Lerp(renderY, cy, smoothAmount);
+
+		// Tránh số thập phân bám mãi gần tọa độ đích
+		if (Mathf.Abs(renderX - cx) < 0.01f)
+		{
+			renderX = cx;
+		}
+
+		if (Mathf.Abs(renderY - cy) < 0.01f)
+		{
+			renderY = cy;
+		}
+	}
+
+	public void resetRenderPosition()
+	{
+		renderX = cx;
+		renderY = cy;
+		renderPositionReady = true;
+		lastRenderUnityFrame = Time.frameCount;
+	}
+
+
 	public void applyCharLevelPercent()
 	{
 		try
@@ -1905,6 +1985,10 @@ public class Char : IMapObject
 				isSetPos = false;
 				cx = xPos;
 				cy = yPos;
+
+				// Không trượt từ vị trí cũ sang vị trí teleport
+				resetRenderPosition();
+
 				cp1 = (cp2 = (cp3 = 0));
 				if (typePos == 1)
 				{
@@ -5217,8 +5301,31 @@ public class Char : IMapObject
 	{
 		isMabuHold = m;
 	}
-
 	public virtual void paint(mGraphics g)
+	{
+		updateRenderPosition();
+
+		// Lưu tọa độ gameplay thật
+		int logicX = cx;
+		int logicY = cy;
+
+		// Chỉ trong lúc vẽ mới dùng tọa độ mượt
+		cx = Mathf.RoundToInt(renderX);
+		cy = Mathf.RoundToInt(renderY);
+
+		try
+		{
+			paintOriginal(g);
+		}
+		finally
+		{
+			// Trả lại ngay tọa độ thật
+			// Server, va chạm, đánh quái vẫn dùng cx/cy gốc
+			cx = logicX;
+			cy = logicY;
+		}
+	}
+	private void paintOriginal(mGraphics g)
 	{
 		if (ModFunc.AnPlayer || isHide)
 		{
@@ -5942,10 +6049,16 @@ public class Char : IMapObject
 			num = -1;
 			num2 = 17;
 		}
-		fBag++;
-		if (fBag > 10000)
+		if (lastBagGameTick != GameCanvas.gameTick)
 		{
-			fBag = 0;
+			lastBagGameTick = GameCanvas.gameTick;
+
+			fBag++;
+
+			if (fBag > 10000)
+			{
+				fBag = 0;
+			}
 		}
 		sbyte b = (sbyte)(fBag / 4 % id.Length);
 		if (!isPaintChar)
@@ -6086,7 +6199,27 @@ public class Char : IMapObject
 		}
 		paintPKFlag(g);
 	}
+	public void paintCharWithSkillSmooth(mGraphics g)
+	{
+		updateRenderPosition();
 
+		int logicX = cx;
+		int logicY = cy;
+
+		cx = Mathf.RoundToInt(renderX);
+		cy = Mathf.RoundToInt(renderY);
+
+		try
+		{
+			paintCharWithSkill(g);
+			paintMount2(g);
+		}
+		finally
+		{
+			cx = logicX;
+			cy = logicY;
+		}
+	}
 	public void paintCharWithSkill(mGraphics g)
 	{
 		ty = 0;
@@ -6223,6 +6356,10 @@ public class Char : IMapObject
 			createShadow(cx, cy, 10);
 			cx = toX;
 			cy = toY;
+
+			// Đây là nhánh di chuyển tức thời
+			resetRenderPosition();
+
 			vMovePoints.removeAllElements();
 			statusMe = 6;
 			cp3 = 0;

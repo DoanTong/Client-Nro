@@ -47,9 +47,9 @@ public class Main : MonoBehaviour
 
 	public const sbyte IP_JB = 3;
 
-	private int updateCount;
+	// private int updateCount;
 
-	private int paintCount;
+	// private int paintCount;
 
 	private int count;
 
@@ -87,6 +87,9 @@ public class Main : MonoBehaviour
 
 	private static int lastFrameProcessed;
 
+	private const int TARGET_RENDER_FPS = 120;
+
+	private int lastSessionUpdateFrame = -1;
 	private void Start()
 	{
 		if (started)
@@ -101,6 +104,13 @@ public class Main : MonoBehaviour
 		isPC = Application.platform != RuntimePlatform.Android && Application.platform != RuntimePlatform.IPhonePlayer;
 		isIPhone = (IphoneVersionApp = Application.platform == RuntimePlatform.IPhonePlayer || Application.platform == RuntimePlatform.Android);
 		started = true;
+
+		// Mở khóa tốc độ render
+		QualitySettings.vSyncCount = 0;
+		Application.targetFrameRate = TARGET_RENDER_FPS;
+
+		// Giữ logic game ở 50 tick/giây
+		Time.fixedDeltaTime = 0.02f;
 		if (isPC && !isIPhone)
 		{
 			level = Rms.loadRMSInt("levelScreenKN");
@@ -144,34 +154,66 @@ public class Main : MonoBehaviour
 		{
 			return;
 		}
+
+		/*
+		* OnGUI có thể được Unity gọi nhiều lần trong cùng một frame:
+		* Layout, Repaint, KeyDown, KeyUp...
+		*
+		* Vì vậy chỉ cập nhật hàng đợi mạng một lần mỗi frame.
+		*/
+		if (lastSessionUpdateFrame != Time.frameCount)
+		{
+			lastSessionUpdateFrame = Time.frameCount;
+
+			Session_ME.update();
+			Session_ME2.update();
+		}
+
+		/*
+		* Vẫn phải gọi checkInput ở mọi event OnGUI
+		* vì bàn phím sử dụng Event.current.
+		*/
+		checkInput();
+
+		/*
+		* Chỉ vẽ khi Unity yêu cầu Repaint.
+		*/
+		if (Event.current.type != EventType.Repaint)
+		{
+			return;
+		}
+
+		// Đếm FPS render thực tế
 		if (fps == 0)
 		{
 			timefps = mSystem.currentTimeMillis();
 		}
-		else if (mSystem.currentTimeMillis() - timefps > 1000)
+		else if (mSystem.currentTimeMillis() - timefps >= 1000)
 		{
 			max = fps;
 			fps = 0;
 			timefps = mSystem.currentTimeMillis();
 		}
+
 		fps++;
-		checkInput();
-		Session_ME.update();
-		Session_ME2.update();
-		if (Event.current.type.Equals(EventType.Repaint) && paintCount <= updateCount)
+
+		/*
+		* Không còn giới hạn:
+		* paintCount <= updateCount
+		*
+		* Nhờ vậy Unity có thể repaint 60/120 lần mỗi giây,
+		* trong khi FixedUpdate vẫn chạy 50 lần mỗi giây.
+		*/
+		if (GameMidlet.gameCanvas != null)
 		{
-			if (GameMidlet.gameCanvas != null)
-			{
-				GameMidlet.gameCanvas.paint(g);
-			}
-			paintCount++;
-			if (g != null)
-			{
-				g.reset();
-			}
+			GameMidlet.gameCanvas.paint(g);
+		}
+
+		if (g != null)
+		{
+			g.reset();
 		}
 	}
-
 	public void setsizeChange()
 	{
 		if (!isRun)
@@ -295,7 +337,7 @@ public class Main : MonoBehaviour
 			}
 			up++;
 			setsizeChange();
-			updateCount++;
+			// updateCount++;
 			ipKeyboard.update();
 			if (GameMidlet.gameCanvas != null)
 			{

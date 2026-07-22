@@ -5018,8 +5018,9 @@ public class GameScr : mScreen, IChatable
 		Char.myCharz().paint(g);
 		if (Char.myCharz().skillPaint != null && Char.myCharz().skillInfoPaint() != null && Char.myCharz().indexSkill < Char.myCharz().skillInfoPaint().Length)
 		{
-			Char.myCharz().paintCharWithSkill(g);
-			Char.myCharz().paintMount2(g);
+			// Char.myCharz().paintCharWithSkill(g);
+			// Char.myCharz().paintMount2(g);
+			Char.myCharz().paintCharWithSkillSmooth(g);
 		}
 		for (int num4 = 0; num4 < vCharInMap.size(); num4++)
 		{
@@ -5034,8 +5035,9 @@ public class GameScr : mScreen, IChatable
 			}
 			if (char4 != null && (!GameCanvas.panel.isShow || !GameCanvas.panel.isTypeShop()) && char4.skillPaint != null && char4.skillInfoPaint() != null && char4.indexSkill < char4.skillInfoPaint().Length)
 			{
-				char4.paintCharWithSkill(g);
-				char4.paintMount2(g);
+				// char4.paintCharWithSkill(g);
+				// char4.paintMount2(g);
+				char4.paintCharWithSkillSmooth(g);
 			}
 		}
 		for (int num5 = 0; num5 < vItemMap.size(); num5++)
